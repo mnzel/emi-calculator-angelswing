@@ -2,6 +2,10 @@
 
 Playwright (TypeScript) automation suite for https://emicalculator.net/, plus QA docs and CI/CD.
 
+## AI assistance
+
+Claude Code was used during this project — for generating the initial Playwright test specs (page object, fixtures, and the 4 scenario specs) from live site exploration, and for polishing the wording of the docs (`docs/test-plan.md`, `docs/test-cases.md`, `docs/test-summary-report.md`, this README). All test logic, selectors, and assertions were verified by actually running the suite against the live site before being committed.
+
 ## Contents
 
 - `docs/test-plan.md` — test strategy, scope, architecture notes, risks
@@ -90,4 +94,4 @@ The site is fully client-side — EMI/chart/table values are computed in-browser
 - **09:00 Seoul Time** daily (`0 0 * * *` UTC)
 - manual `workflow_dispatch`
 
-HTML report and traces are uploaded as build artifacts (14-day retention) for triage.
+
