@@ -1,51 +1,55 @@
 import { test, expect } from '@fixtures/base';
 import { calculateEmi } from '@utils/emiMath';
+import { LoanInput } from '@pages/EmiCalculatorPage';
 
 interface Case {
   name: string;
-  amount: number;
-  rate: number;
-  tenureYears: number;
+  loan: LoanInput;
 }
 
+// These 5 cases cover typical usage plus boundaries: min/max loan amount,
+// min/max interest rate, and short/long tenure. Each is cross-checked against
+// calculateEmi(), an independently-implemented formula (not the site's own JS),
+// so a bug in the site's own calculation logic will actually be caught instead
+// of the test just re-confirming whatever the site computes.
 const cases: Case[] = [
-  { name: 'typical home loan', amount: 5_000_000, rate: 9, tenureYears: 20 },
-  { name: 'small amount / short tenure', amount: 100_000, rate: 5, tenureYears: 1 },
-  { name: 'large amount / long tenure', amount: 20_000_000, rate: 20, tenureYears: 30 },
-  { name: 'low interest boundary', amount: 5_000_000, rate: 5, tenureYears: 10 },
-  { name: 'high interest boundary', amount: 5_000_000, rate: 20, tenureYears: 10 },
+  { name: 'typical home loan', loan: { amount: 5_000_000, ratePct: 9, tenureYears: 20 } },
+  { name: 'small amount / short tenure', loan: { amount: 100_000, ratePct: 5, tenureYears: 1 } },
+  { name: 'large amount / long tenure', loan: { amount: 20_000_000, ratePct: 20, tenureYears: 30 } },
+  { name: 'low interest boundary', loan: { amount: 5_000_000, ratePct: 5, tenureYears: 10 } },
+  { name: 'high interest boundary', loan: { amount: 5_000_000, ratePct: 20, tenureYears: 10 } },
 ];
 
 // Rounding tolerance to absorb the site's own intermediate rounding.
 const RUPEE_TOLERANCE = 5;
 
 test.describe('Scenario 2 — EMI calculation matches formula', () => {
-  for (const { name, amount, rate, tenureYears } of cases) {
+  for (const { name, loan } of cases) {
     test(`EMI/interest/total match formula for ${name}`, async ({ emiPage }) => {
-      await emiPage.setLoanAmount(amount);
-      await emiPage.setInterestRate(rate);
-      await emiPage.setTenure(tenureYears, 'years');
+      await emiPage.setLoan(loan);
 
       const expected = calculateEmi({
-        principal: amount,
-        annualRatePct: rate,
-        tenureMonths: tenureYears * 12,
+        principal: loan.amount,
+        annualRatePct: loan.ratePct,
+        tenureMonths: loan.tenureYears * 12,
       });
-
-      await expect.poll(() => emiPage.getEmi()).toBeGreaterThan(0);
 
       const actualEmi = await emiPage.getEmi();
       const actualTotalInterest = await emiPage.getTotalInterest();
       const actualTotalPayment = await emiPage.getTotalPayment();
+      const monthCount = loan.tenureYears * 12;
 
       expect(Math.abs(actualEmi - expected.emi)).toBeLessThanOrEqual(RUPEE_TOLERANCE);
       expect(Math.abs(actualTotalInterest - expected.totalInterest)).toBeLessThanOrEqual(
-        RUPEE_TOLERANCE * tenureYears * 12,
+        RUPEE_TOLERANCE * monthCount,
       );
       expect(Math.abs(actualTotalPayment - expected.totalPayment)).toBeLessThanOrEqual(
-        RUPEE_TOLERANCE * tenureYears * 12,
+        RUPEE_TOLERANCE * monthCount,
       );
 
+      // Sanity check independent of the formula cross-check above: the 3 numbers
+      // the site displays (principal, interest, total) must agree with each other,
+      // regardless of whether they match the expected formula values.
       // Internal consistency: principal + interest breakdown must sum to total payment.
       const actualPrincipal = await emiPage.getLoanAmountInputValue();
       expect(actualTotalPayment).toBe(actualTotalInterest + actualPrincipal);

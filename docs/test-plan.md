@@ -1,81 +1,69 @@
 # Test Plan — EMI Calculator (emicalculator.net)
 
-## 1. Objective
+## What I'm testing and why
 
-Validate the correctness, usability, and reliability of the EMI Calculator widget for Home Loan, Car Loan, and Personal Loan at `https://emicalculator.net/`, and establish an automated regression suite that runs on every change and on a daily schedule.
+emicalculator.net has a loan EMI calculator with three tabs — Home Loan, Personal Loan, Car Loan. You punch in a loan amount, interest rate, and tenure (either by typing or dragging a slider), and it shows you the monthly EMI, total interest, and total payment, plus a chart and a year-by-year payment schedule you can also download as Excel.
 
-## 2. Scope
+The goal here is to make sure all of that actually works correctly, and to set up an automated suite that keeps checking it going forward instead of me having to click through it by hand every time.
 
-### In scope
-- Home Loan / Personal Loan / Car Loan calculator tabs on the landing page
-- Loan Amount, Interest Rate, Loan Tenure inputs (text field + slider, two-way bound)
-- EMI, Total Interest Payable, Total Payment result values
-- Break-up pie chart and year-wise bar/line chart (Highcharts)
-- Year-wise amortization schedule table (with month-level drill-down rows)
-- "Download Excel Spreadsheet" export
-- Client-side input validation (min/max/negative/non-numeric)
+## What's in scope
 
-### Out of scope
-- Other calculators linked from the nav (Credit Card EMI, Loan Calculator, etc.) — separate pages, not covered by this plan
-- Marketing/article content, ads
-- Payment/authentication flows (site has none)
+- The Home / Personal / Car Loan tabs on the homepage
+- Loan Amount, Interest Rate, Loan Tenure — both the text boxes and the sliders (they're supposed to stay in sync)
+- The EMI / Total Interest / Total Payment numbers
+- The pie chart and the year-wise bar chart
+- The amortization table (the one you can expand to see month-by-month)
+- The "Download Excel Spreadsheet" button
+- What happens with weird input (negative numbers, letters, empty fields, etc.)
 
-## 3. System Under Test — architecture notes
+## What's out of scope
 
-The calculator is **fully client-side**: loan amount/rate/tenure are read from `#loanamount` / `#loaninterest` / `#loanterm`, and EMI/interest/chart/table values are computed and rendered in-browser via JavaScript (jQuery UI for the sliders, Highcharts for the charts). No XHR/fetch calls were observed carrying loan data to a backend during manual inspection — the "Download Excel Spreadsheet" action is also client-generated (no network request), producing a `.xlsx` file directly in the browser.
+- Other calculators on the site (Credit Card EMI, generic Loan Calculator) — different pages, not part of this
+- Blog/article content, ads
+- There's no login or payment on this site, so nothing to test there
 
-**Implication for the "API layer" requirement**: there is no first-party REST/JSON API to contract-test. The equivalent of API-layer testing here is **formula-based verification of the client-side calculation logic** (Scenario 2 in the automation set) — treating the in-page JS calculation engine as the "service" under test and independently re-deriving expected values from the published EMI formula:
+## A note on the "API layer"
 
-```
-EMI = P × r × (1 + r)^n / ((1 + r)^n − 1)
-```
-where `P` = principal, `r` = monthly interest rate, `n` = tenure in months.
+I poked around in the network tab expecting to find some backend API doing the EMI math, but there isn't one — everything happens in the browser with JavaScript. The amount/rate/tenure never leave the page, and even the Excel file gets built client-side. So there's no API to write contract tests against.
 
-If a hidden API is discovered later (e.g. via deeper network tracing across all three loan types), the same Playwright `request` fixture can be added for direct contract tests without changing the page-object layer.
+What I did instead: I wrote my own EMI formula in code (`EMI = P × r × (1+r)^n / ((1+r)^n − 1)`) and use it to double-check the numbers the site shows. If the site's own JavaScript has a bug in the math, this catches it — which is really the same goal an API test would have, just aimed at the in-browser calculation engine instead of a server.
 
-## 4. Test Types & Approach
+If it turns out there IS a hidden API somewhere I missed, Playwright has a `request` fixture I can drop in later without touching anything else.
 
-| Type | Approach |
-|---|---|
-| Functional | Manual test cases (docs/test-cases.md) + automated Playwright specs for core flows |
-| UI / Layout | Manual checks (responsive breakpoints, chart legend, slider handle visuals); automated assertions on visible result text |
-| Boundary / Negative | Manual + a parametrized automated suite (Scenario 2) covering min/max amount, rate, tenure |
-| Cross-browser | Automated suite runs on Chromium, Firefox, WebKit via Playwright projects |
-| Regression | Full automated suite on every push/PR, plus daily scheduled runs (Nepal 9AM, Seoul 9AM) |
-| Data integrity | Automated cross-validation: displayed EMI vs. independently computed formula; chart series vs. table rows; downloaded file contents vs. on-screen values |
+## How I'm approaching each type of testing
 
-## 5. Test Environment
+- **Functional** — mix of manual clicking around plus Playwright specs for the core flows
+- **UI** — mostly manual (does it look right, is the chart legend readable, etc.), automation only checks that the text values are correct
+- **Boundary/negative** — automated for the "does the math still work at min/max values" cases, manual for "what happens if I type garbage into the field"
+- **Cross-browser** — the automated suite runs on Chromium, Firefox, and WebKit
+- **Regression** — full suite runs on every push/PR, plus twice a day on a schedule
+- **Data integrity** — this is the interesting one: I cross-check the EMI number against my own formula, cross-check the chart against the table, and cross-check the downloaded file against what's on screen. Three different "does this actually match" checks instead of just eyeballing one number.
 
-- Target: production site `https://emicalculator.net/` (no staging environment available)
-- Browsers: Chromium, Firefox, WebKit (desktop viewports) via Playwright
-- CI: GitHub Actions, `ubuntu-latest`, Node 20
+## Environment
 
-## 6. Entry / Exit Criteria
+Testing straight against the live production site (`https://emicalculator.net/`) — there's no staging environment to point at. Browsers are Chromium/Firefox/WebKit via Playwright, CI runs on GitHub Actions (Ubuntu, Node 20).
 
-**Entry**: site reachable, calculator widget renders with default values.
-**Exit**: all automated specs green across all 3 browser projects; no flaky test after a `--repeat-each` sanity run; manual test cases in `test-cases.md` executed with no unresolved Critical/High severity defects.
+## When am I done
 
-## 7. Risks & Mitigations
+Start: site loads, calculator shows default values.
+Done: all automated specs pass on all 3 browsers, running the suite a few times in a row doesn't produce any flaky failures, and the manual test cases have been run through with no unresolved Critical/High bugs.
 
-| Risk | Mitigation |
-|---|---|
-| jQuery UI sliders aren't native `<input type=range>` — naive `fill()`/keyboard approaches don't work | Page Object drags the `.ui-slider-handle` using live-read min/max from the jQuery UI widget instance, computing target pixel position from the track's bounding box |
-| Third-party site changes markup without notice | Selectors centralized in one Page Object (`EmiCalculatorPage.ts`); a markup change breaks one file, not every spec |
-| Rounding differences between our formula and the site's internal rounding | Small tolerances (a few rupees) applied on numeric comparisons instead of exact equality |
-| Flaky timing (chart/table not yet rendered after input change) | All reads follow explicit `expect.poll` on a results value settling; no fixed `waitForTimeout` sleeps |
-| Live production site — no test data isolation | Tests only read/compute; the one mutating action (file download) writes to a temp path and deletes it afterward |
+## Risks I thought about
 
-## 8. Automation Summary
+- **The sliders aren't normal HTML sliders.** They're jQuery UI widgets, so you can't just fill them like a text input. I had to read the widget's actual min/max and drag the handle to the right pixel position.
+- **It's someone else's site, so it can change without warning.** I kept all the selectors in one file (the Page Object) so if something breaks, I fix it in one place instead of hunting through every test.
+- **Rounding.** My formula and the site's own math won't always land on the exact same rupee due to internal rounding, so comparisons allow a small tolerance instead of demanding an exact match.
+- **Timing flakiness.** Nothing waits on a fixed sleep — every check polls for the value to actually update first.
+- **It's production, I can't reset test data.** I only read values and do one download (into a temp file I delete right after), so there's nothing to clean up or worry about polluting.
 
-See `README.md` for how to run, and `tests/*.spec.ts` for the 4 required automated scenarios:
-1. `slider-update.spec.ts` — slider-driven updates to amount/rate/tenure
-2. `emi-calculation.spec.ts` — EMI/interest/total cross-validated against the formula, parametrized across 5 boundary/typical cases
-3. `chart-table-consistency.spec.ts` — Highcharts series vs. amortization table, year-by-year
-4. `excel-download.spec.ts` — download triggered, file parsed, EMI value cross-checked inside the spreadsheet
+## The 4 automated scenarios
 
-## 9. CI/CD
+Full details in the README, but briefly:
+1. `slider-update.spec.ts` — drag the sliders, check the linked inputs and EMI update
+2. `emi-calculation.spec.ts` — 5 different loan setups, check the EMI/interest/total against my own formula
+3. `chart-table-consistency.spec.ts` — check the chart and the table agree, year by year
+4. `excel-download.spec.ts` — download the file, actually open it and check the numbers inside match what's on screen
 
-GitHub Actions workflow `.github/workflows/e2e.yml`:
-- Runs on every push to `main`/`master` and every PR
-- Scheduled runs: **09:00 Nepal Time** (`15 3 * * *` UTC) and **09:00 Seoul Time** (`0 0 * * *` UTC)
-- Uploads HTML report + traces as artifacts on failure for fast triage
+## CI/CD
+
+GitHub Actions workflow (`.github/workflows/e2e.yml`) runs the suite on every push/PR, plus twice a day: 9am Nepal time and 9am Seoul time.

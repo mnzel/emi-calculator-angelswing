@@ -3,6 +3,12 @@ import { parseRupees } from '@utils/emiMath';
 
 export type TenureUnit = 'years' | 'months';
 
+export interface LoanInput {
+  amount: number;
+  ratePct: number;
+  tenureYears: number;
+}
+
 export interface YearRow {
   year: number;
   principal: number;
@@ -85,6 +91,18 @@ export class EmiCalculatorPage {
       await this.tenureMonthsRadio.check();
     }
     await this.fillAndCommit(this.loanTenureInput, String(value));
+  }
+
+  /**
+   * Sets amount/rate/tenure in one call and waits for the EMI to settle to a
+   * non-zero value — the common "configure a loan, then read results" setup
+   * shared by every scenario that isn't specifically about the sliders.
+   */
+  async setLoan({ amount, ratePct, tenureYears }: LoanInput) {
+    await this.setLoanAmount(amount);
+    await this.setInterestRate(ratePct);
+    await this.setTenure(tenureYears, 'years');
+    await expect.poll(() => this.getEmi()).toBeGreaterThan(0);
   }
 
   private async fillAndCommit(input: Locator, value: string) {

@@ -1,78 +1,77 @@
 # Test Cases — EMI Calculator (emicalculator.net)
 
-Legend: **[A]** = automated in this repo, **[M]** = manual/exploratory.
+[A] = Autoamted, [M] = Manual Check
 
-## 1. Functional — Core Calculation
+## 1. Calculation basics
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| FN-01 | Default state loads with sane values | Open site | Loan Amount, Interest Rate, Tenure pre-filled with non-zero defaults; EMI/Interest/Total displayed | [M] |
-| FN-02 | Changing Loan Amount recalculates EMI | Enter new amount in input, blur | EMI, Total Interest, Total Payment update; slider handle moves to match | [A] (emi-calculation.spec.ts) |
-| FN-03 | Changing Interest Rate recalculates EMI | Enter new rate, blur | EMI/Interest/Total update accordingly | [A] |
-| FN-04 | Changing Tenure (years) recalculates EMI | Enter new tenure, unit = Yr | EMI/Interest/Total update | [A] |
-| FN-05 | Switching tenure unit Yr ↔ Mo converts value | Toggle radio, observe input | Tenure numeric value converts consistently (e.g. 5 Yr → 60 Mo) | [M] |
-| FN-06 | EMI matches standard amortization formula | Set known P/r/n | `EMI = P·r·(1+r)^n / ((1+r)^n−1)` within rounding tolerance | [A] |
-| FN-07 | Total Payment = Principal + Total Interest | Any valid input set | Displayed Total Payment equals Principal + Total Interest exactly | [A] |
-| FN-08 | Switching Home/Personal/Car Loan tabs preserves independent state | Set values on Home tab, switch to Car tab, switch back | Each tab retains its own last-entered values (or documented reset behavior) | [M] |
+| FN-01 | Page loads with sensible defaults | Just open the site | Amount/Rate/Tenure are pre-filled, EMI numbers show up right away | [M] |
+| FN-02 | Changing the loan amount recalculates everything | Type a new amount | EMI/Interest/Total update, slider moves to match | [A] (emi-calculation.spec.ts) |
+| FN-03 | Changing the interest rate recalculates everything | Type a new rate | Same as above | [A] |
+| FN-04 | Changing the tenure recalculates everything | Type a new tenure (years) | Same as above | [A] |
+| FN-05 | Switching between Years/Months keeps the tenure consistent | Toggle the Yr/Mo radio | 5 years should become 60 months, not some random number | [M] |
+| FN-06 | EMI actually matches the real formula | Set a known amount/rate/tenure | `EMI = P·r·(1+r)^n / ((1+r)^n−1)`, give or take rounding | [A] |
+| FN-07 | The three result numbers agree with each other | Any valid inputs | Total Payment should exactly equal Principal + Total Interest | [A] |
+| FN-08 | Tabs (Home/Personal/Car) keep their own values | Set something on Home tab, flip to Car tab, flip back | Home tab should still show what we typed | [M] — **it doesn't, see BUG-001** |
 
-## 2. Functional — Sliders
+## 2. Sliders
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| SL-01 | Drag Loan Amount slider updates input | Drag handle to a target position | Text input reflects dragged value (within one slider step) | [A] (slider-update.spec.ts) |
-| SL-02 | Drag Interest Rate slider updates input | Drag handle | Text input reflects dragged value | [A] |
-| SL-03 | Drag Loan Tenure slider updates input | Drag handle | Text input reflects dragged value | [A] |
-| SL-04 | Slider drag to minimum bound | Drag to leftmost | Input shows slider's configured minimum, no error | [M] |
-| SL-05 | Slider drag to maximum bound | Drag to rightmost | Input shows slider's configured maximum, no error | [M] |
-| SL-06 | Typing in input moves slider handle | Type a value directly in the text field | Slider handle position updates to match (two-way binding) | [M] |
+| SL-01 | Dragging the amount slider updates the input | Drag the handle | Text box shows roughly the value we dragged to | [A] (slider-update.spec.ts) |
+| SL-02 | Same, for the interest rate slider | Drag the handle | Same | [A] |
+| SL-03 | Same, for the tenure slider | Drag the handle | Same | [A] |
+| SL-04 | Slider at its lowest setting works fine | Drag all the way left | Shows the min value, no error | [M] |
+| SL-05 | Slider at its highest setting works fine | Drag all the way right | Shows the max value, no error | [M] |
+| SL-06 | Typing in the box also moves the slider | Type directly into the field | Slider handle jumps to match | [M] |
 
-## 3. Boundary / Negative — Inputs
+## 3. Edge cases / weird input
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| BD-01 | Minimum interest rate boundary | Set rate to slider minimum (5%) | Calculates without error | [A] (parametrized case) |
-| BD-02 | Maximum interest rate boundary | Set rate to slider maximum (20%) | Calculates without error | [A] |
-| BD-03 | Very small loan amount | Set amount to a small positive value (e.g. ₹1,00,000) | EMI calculates correctly, no divide-by-zero | [A] |
-| BD-04 | Very large loan amount | Set amount to slider maximum (₹2,00,00,000) | EMI calculates correctly, numbers render without overflow/truncation | [A] |
-| BD-05 | Short tenure (1 year) | Set tenure to 1 year | EMI ≈ amortized monthly principal + interest, matches formula | [A] |
-| BD-06 | Long tenure (30 years) | Set tenure to slider maximum | EMI calculates correctly | [A] |
-| BD-07 | Negative or non-numeric input typed directly | Type `-5000` or `abc` into Loan Amount field | Input rejects/clamps invalid value; no JS error; EMI stays valid | [M] |
-| BD-08 | Empty input field | Clear Loan Amount field entirely, blur | Field reverts to last valid value or a sane default; no crash | [M] |
-| BD-09 | Decimal interest rate | Enter `9.25` as interest rate | Accepted, EMI recalculates using the decimal rate | [M] |
+| BD-01 | Lowest allowed interest rate | Set rate to 5% (the slider min) | Calculates fine, no errors | [A] |
+| BD-02 | Highest allowed interest rate | Set rate to 20% (the slider max) | Calculates fine | [A] |
+| BD-03 | Really small loan amount | e.g. ₹1,00,000 | Still calculates correctly, no divide-by-zero weirdness | [A] |
+| BD-04 | Really big loan amount | ₹2,00,00,000 (slider max) | Numbers display correctly, nothing overflows or gets cut off | [A] |
+| BD-05 | Very short tenure | 1 year | Formula still holds | [A] |
+| BD-06 | Very long tenure | 30 years (slider max) | Formula still holds | [A] |
+| BD-07 | Typing garbage into the amount field | Type `-5000` or `abc` | Should get rejected/ignored, not break the calculator | [M] |
+| BD-08 | Decimal interest rate | Type `9.25` | Accepted, EMI uses the decimal properly | [M] |
 
-## 4. Data Consistency — Chart & Table
+## 4. Chart & table matching up
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| DC-01 | Pie chart percentages sum to 100% | Read pie chart Principal/Interest slices | Slices sum to 100% (± rounding) and match Total Payment breakdown | [M] |
-| DC-02 | Bar chart year-wise Principal matches table | Set a loan, read chart series vs. table rows | Each year's chart Principal value equals the table's Principal (A) column | [A] (chart-table-consistency.spec.ts) |
-| DC-03 | Bar chart year-wise Interest matches table | Same as above for Interest | Chart Interest series equals table Interest (B) column per year | [A] |
-| DC-04 | Table "Balance" trends to zero by final year | Inspect last row of amortization table | Balance ≈ ₹0 in the final year of the tenure | [M] |
-| DC-05 | Table row expand shows monthly breakdown | Click "+" on a year row | Row expands into 12 monthly rows summing to the annual row | [M] |
-| DC-06 | Sum of all yearly Principal rows ≈ Loan Amount | Sum table's Principal column across all years | Total ≈ original loan amount (± ₹ rounding) | [M] |
+| DC-01 | Pie chart adds up to 100% | Look at the Principal/Interest slices | Should sum to 100% (rounding aside) and match the actual breakdown | [M] |
+| DC-02 | Bar chart's yearly Principal matches the table | Set a loan, compare chart vs table | Each year's numbers should be the same in both places | [A] (chart-table-consistency.spec.ts) |
+| DC-03 | Same, for Interest | Compare chart vs table | Same | [A] |
+| DC-04 | Balance hits ~zero by the end | Look at the last row of the table | Should be close to ₹0 in the final year | [M] |
+| DC-05 | Expanding a year shows the monthly breakdown | Click the "+" next to a year | 12 months show up and they should add up to that year's total | [M] |
+| DC-06 | All the yearly principal amounts add up to the loan amount | Sum the Principal column | Should roughly equal what we borrowed | [M] |
 
-## 5. Excel Export
+## 5. Excel download
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| EX-01 | Download button produces a file | Click "Download Excel Spreadsheet" | Browser download event fires, file has `.xlsx`/`.xls` extension, size > 0 | [A] (excel-download.spec.ts) |
-| EX-02 | Downloaded file content matches on-screen EMI | Parse downloaded file | Sheet contains the same EMI value shown on the page | [A] |
-| EX-03 | Downloaded file contains full amortization schedule | Parse downloaded file | Row count / years present match the on-screen table | [M] (spot-checked automatically for first year; full parity manual) |
-| EX-04 | File opens cleanly in Excel/Google Sheets | Manually open downloaded file | No corruption warnings, formatting intact | [M] |
+| EX-01 | Download button actually gives you a file | Click "Download Excel Spreadsheet" | File downloads, has an .xlsx extension, isn't empty | [A] (excel-download.spec.ts) |
+| EX-02 | The file's EMI matches what's on screen | Open/parse the file | Same EMI number appears in the spreadsheet | [A] |
+| EX-03 | The file has the full year-by-year schedule, and it's correct | Open/parse the file | Every year's Principal/Interest/Balance in the file matches the table on screen | [A] |
+| EX-04 | File isn't corrupted | Open it in Excel/Sheets by hand | Opens cleanly, no warnings | [M] |
 
-## 6. UI / Cross-Browser / Responsiveness
+## 6. Cross-browser / layout
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| UI-01 | Calculator renders correctly on Chromium | Load site | Layout matches design, no overlapping elements | [A] (all specs run on chromium project) |
-| UI-02 | Calculator renders correctly on Firefox | Load site | Same | [A] (firefox project) |
-| UI-03 | Calculator renders correctly on WebKit/Safari | Load site | Same | [A] (webkit project) |
-| UI-04 | Mobile viewport layout | Resize to mobile width | Table switches to condensed columns (`d-sm-none` classes observed), sliders remain usable | [M] |
-| UI-05 | Currency formatting | Inspect all rupee values | Consistent `₹ X,XX,XXX` Indian-digit-grouping format throughout | [M] |
+| UI-01 | Works on Chrome | Load the site | Looks right, nothing overlapping | [A] (chromium) |
+| UI-02 | Works on Firefox | Load the site | Same | [A] (firefox) |
+| UI-03 | Works on Safari | Load the site | Same | [A] (webkit) |
+| UI-04 | Works on mobile-sized screens | Shrink the browser | Table switches to a condensed layout, sliders still usable | [M] |
+| UI-05 | Currency formatting is consistent everywhere | Scan all the rupee values on the page | Should all use the same ₹ X,XX,XXX style | [M] |
 
-## 7. Regression
+## 7. Regression / ongoing
 
-| ID | Title | Steps | Expected | Status |
+| ID | What we're checking | How | What should happen | Status |
 |---|---|---|---|---|
-| RG-01 | Full automated suite passes on every push/PR | CI trigger | All specs green across chromium/firefox/webkit | [A] (CI) |
-| RG-02 | Scheduled daily run catches upstream site regressions | Cron trigger (Nepal 9AM / Seoul 9AM) | Suite runs unattended, reports failures via CI artifacts | [A] (CI) |
+| RG-01 | Full suite passes on every code change | CI runs on push/PR | Everything green across all 3 browsers | [A] (CI) |
+| RG-02 | We catch it if the live site breaks, even with no code changes | Scheduled run, 9am Nepal / 9am Seoul | Suite runs on its own, flags failures | [A] (CI) |
