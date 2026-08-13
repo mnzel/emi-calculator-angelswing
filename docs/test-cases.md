@@ -1,6 +1,6 @@
 # Test Cases — EMI Calculator (emicalculator.net)
 
-[A] = Autoamted, [M] = Manual Check
+[A] = Automated, [M] = Manual Check
 
 ## 1. Calculation basics
 

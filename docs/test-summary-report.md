@@ -14,14 +14,6 @@ Went through the EMI Calculator on emicalculator.net (Home/Personal/Car Loan tab
 - Chrome, Firefox, and Safari
 - A manual pass on things like weird input, switching tabs, resizing the browser
 
-## How it went
-
-- 35 test cases written up total
-- 10 of those got automated, run across all 3 browsers = 30 test runs
-- All 30 passed, every time I ran it — no flaky tests
-- 8 more test cases were checked by hand
-- Found 1 bug (low severity) — see below
-
 ## What the automated tests actually check
 
 - **`slider-update.spec.ts`** — drag each slider, make sure the linked input and the EMI update
