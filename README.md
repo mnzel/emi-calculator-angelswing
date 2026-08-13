@@ -48,11 +48,10 @@ npx playwright install --with-deps
 ## Running tests
 
 ```bash
-npm test                 # headless, all 3 browsers (chromium/firefox/webkit)
+npm test                 # headless, chromium
 npm run test:headed      # headed, see the browser
 npm run test:ui          # Playwright UI mode
 npx playwright test tests/slider-update.spec.ts   # single spec
-npx playwright test --project=chromium             # single browser
 npm run report            # open the last HTML report
 npm run typecheck         # tsc --noEmit
 ```
@@ -74,16 +73,16 @@ The site is fully client-side — EMI/chart/table values are computed in-browser
 
 ## Regression strategy
 
-- **Every push/PR**: full suite (10 scenarios × 3 browsers = 30 runs) via `.github/workflows/e2e.yml`, blocking merge on failure.
+- **Every push/PR**: full suite (4 specs, chromium) via `.github/workflows/e2e.yml`, blocking merge on failure.
 - **Daily scheduled runs**: 09:00 Nepal Time and 09:00 Seoul Time (see CI/CD below) — catches the upstream production site regressing even with no code changes on our side, since this repo tests a live third-party site rather than one we deploy ourselves.
 - **Failure triage**: HTML report + trace + video uploaded as CI artifacts on every run (retained 14 days), so a red build doesn't require a local re-run to diagnose.
 
 ## Flakiness
 
 - No fixed `waitForTimeout` sleeps anywhere — every read waits on an `expect`/`expect.poll` for a settled value.
-- The amortization table reader batches all rows/cells into a single `page.evaluate` (fast and avoids per-cell locator round-trips that timed out intermittently on WebKit during development).
+- The amortization table reader batches all rows/cells into a single `page.evaluate` (fast and avoids per-cell locator round-trips).
 - Numeric comparisons use small rupee tolerances to absorb the site's own internal rounding rather than asserting exact equality where that would be brittle.
-- Verified 30/30 passing across chromium/firefox/webkit with zero retries needed across repeated full-suite runs.
+- Verified passing on chromium with zero retries needed across repeated full-suite runs.
 
 ## CI/CD
 
